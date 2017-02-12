@@ -1,7 +1,6 @@
 var showLogs = false;
 
-var disabled = {},
-  gfw = 'http://www.greatfirewallofchina.org',
+var disabled = true, gfw = 'http://www.greatfirewallofchina.org',
   triggers = ['shang+fulin+graft', 'zhang+yannan', 'celestial+empire', 'grass+mud+horse', '草泥'],
   engines = ['^(www\.)*google\.((com\.|co\.|it\.)?([a-z]{2})|com)$', '^(www\.)*bing\.(com)$', 'search\.yahoo\.com$'];
 
@@ -12,8 +11,10 @@ chrome.runtime.onStartup.addListener(function() {
 
 chrome.runtime.onInstalled.addListener(function() {
     getTriggersFromLocalStorage();
+    chrome.storage.local.set({
+        disabled: ["www.facebook.com"]
+    });
 });
-
 chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
   //console.log('onUpdated', tabId, changeInfo, tab);
   if (changeInfo && changeInfo.status == "complete") {
@@ -28,7 +29,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, callback) {
 
   if (request.what === "checkPage") {
 
-    if (typeof disabled[sender.tab.id] !== 'undefined') {
+    if (disabled) {
 
       // setTimeout(function () {
       //   delete disabled[sender.tab.id];
@@ -74,30 +75,28 @@ chrome.runtime.onMessage.addListener(function (request, sender, callback) {
     // otherwise check with china servers
     checkPage(sender.tab, callback);
 
-  } else if (request.what === "disablePage") { // from popup
+  } else if (request.what === "disablePage" || request.what === "resumePage") { // press button
 
-    // add to disabled-tabId table
-    disabled[request.tabId] = true;
-    // and reload (will trigger content-script and be ignored)
-    chrome.tabs.reload(request.tabId);
+    // remove from disabled-tabId table -> Local Storage
+     chrome.storage.local.get('disabled', function(disabled) {
+        
+         if (request.what === "disablePage")
+             disabled[request.tabId] = true;
+         else if (request.what === "resumePage")
+             delete disabled[request.tabId];
 
-  } else if (request.what === "resumePage") {
-   
-    // remove from disabled-tabId table
-    delete disabled[request.tabId];
-    //reload the page
-    chrome.tabs.reload(request.tabId);
+         chrome.storage.local.set({
+             disabled: disabled
+         }, function() {
+             //reload the page
+             chrome.tabs.reload(request.tabId);
+         });
+     });
     
-  } else if ( request.what === "isOnDisabledList" ) {
-      
-      if (typeof disabled[request.tabId] !== 'undefined') {
-
-      callback && callback({
-        status: 'disabled'
-      });
-
-    }
-
+  } else if ( request.what === "isOnDisabledList" ) { //button text
+     console.log(request.url);
+     isOnDisabledList(request.url, callback)
+    
   }
 
   return true;
@@ -121,6 +120,29 @@ function keysValues(href) {
   return vars;
 }
 
+function isOnDisabledList(targeturl, callback){
+       console.log("isOnnDisabledList:", targeturl, callback);
+       chrome.storage.local.get('disabled', function(result) {
+
+         var targetDomain = HostNameFromURI(targeturl), disabled = result.disabled;
+         console.log(disabled, targetDomain, disabled.indexOf(targetDomain));
+         if (typeof disabled.indexOf(targetDomain) !== -1) {
+              callback && callback({
+             status: 'disabled'
+         });
+
+
+         }
+     });
+    
+
+}
+
+var HostNameFromURI = function(url) {
+  var matches = url.match(/^https?\:\/\/([^\/:?#]+)(?:[\/:?#]|$)/i);
+  var domain = matches && matches[1];
+  return domain;
+}
 var checkPage = function (tab, callback) {
 
   showLogs && console.log('checkPage:', tab.url);

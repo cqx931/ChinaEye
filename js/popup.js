@@ -16,14 +16,14 @@ document.addEventListener('DOMContentLoaded', function () {
     chrome.tabs.sendMessage(tabs[0].id, {
       what: 'isActive',
     }, function (res) {
-      //console.log('isActive?',res);
-      updateButton(button, tabs[0].id, !res || res.active);
+      console.log('isActive?', res);
+      updateButton(button, tabs[0].url, !res || res.active);
     });
   });
 });
 
 
-function updateButton(button, tabId, on) {
+function updateButton(button, tabUrl, on) {
 
   console.log('updateButton', on);
 
@@ -37,8 +37,9 @@ function updateButton(button, tabId, on) {
   } else {
       chrome.runtime.sendMessage({
           what: "isOnDisabledList",
-          tabId: tabId
+          url: tabUrl
       }, function(res) {
+         console.log(res);
 
           if (res && res.status == 'disabled') {
               button.disabled = false;
@@ -57,7 +58,7 @@ function updateButton(button, tabId, on) {
 
     chrome.runtime.sendMessage({
       what: message,
-      tabId: tabId
+      url: tabUrl
     });
 
     window.close();
